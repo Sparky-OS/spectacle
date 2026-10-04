@@ -73,9 +73,21 @@ QImage combinedImage(const QList<QImage> &images)
     QRectF imageRect;
     qreal maxDpr = 0;
     ImageMetaData::SubGeometryList geometryList;
-    for (auto &i : images) {
+    QList<QPointF> positions;
+    positions.reserve(images.size());
+    for (const auto &image : images) {
+        auto position = ImageMetaData::logicalXY(image);
+        for (const auto &other : images) {
+            if (ImageMetaData::isStereo(other) && ImageMetaData::logicalXY(other).x() < position.x()) {
+                position.rx() += other.deviceIndependentSize().width() / 2;
+            }
+        }
+        positions.push_back(position);
+    }
+    for (qsizetype index = 0; index < images.size(); ++index) {
+        const auto &i = images.at(index);
         const auto dpr = i.devicePixelRatio();
-        const auto rect = QRectF{ImageMetaData::logicalXY(i), i.deviceIndependentSize()};
+        const auto rect = QRectF{positions.at(index), i.deviceIndependentSize()};
         maxDpr = std::max(maxDpr, dpr);
         imageRect |= rect;
         geometryList << ImageMetaData::subGeometryPropertyMap(rect, dpr);
@@ -87,10 +99,11 @@ QImage combinedImage(const QList<QImage> &images)
     if (allSameDpr) {
         QImage finalImage{imageRect.size().toSize() * maxDpr, finalFormat};
         QPainter painter(&finalImage);
-        for (auto &image : images) {
+        for (qsizetype index = 0; index < images.size(); ++index) {
+            const auto &image = images.at(index);
             // Explicitly setting the position and size so that you don't need to read
             // QPainter source code to understand how this works.
-            painter.drawImage({ImageMetaData::logicalXY(image) * maxDpr, image.size()}, image);
+            painter.drawImage({positions.at(index) * maxDpr, image.size()}, image);
         }
         painter.end();
         // Setting DPR after painting prevents it from affecting the coordinates of the QPainter.
@@ -99,6 +112,7 @@ QImage combinedImage(const QList<QImage> &images)
         // It might not even be directly related to QPainter, so keep an eye out for bugs like that.
         finalImage.setDevicePixelRatio(maxDpr);
         ImageMetaData::setSubGeometryList(finalImage, geometryList);
+        ImageMetaData::setStereo(finalImage, false);
         return finalImage;
     }
     // We ceil to the next integer size up so that integer DPR images are always crisp.
@@ -106,8 +120,9 @@ QImage combinedImage(const QList<QImage> &images)
     QImage finalImage{imageRect.size().toSize() * finalDpr, finalFormat};
     finalImage.fill(Qt::transparent);
     QPainter painter(&finalImage);
-    for (auto &image : images) {
-        const auto pos = ImageMetaData::logicalXY(image) * finalDpr;
+    for (qsizetype index = 0; index < images.size(); ++index) {
+        const auto &image = images.at(index);
+        const auto pos = positions.at(index) * finalDpr;
         const auto size = (image.deviceIndependentSize() * finalDpr).toSize();
         const auto imageDpr = image.devicePixelRatio();
         const bool hasIntDpr = static_cast<int>(imageDpr) == imageDpr;
@@ -120,6 +135,7 @@ QImage combinedImage(const QList<QImage> &images)
     painter.end();
     finalImage.setDevicePixelRatio(finalDpr);
     ImageMetaData::setSubGeometryList(finalImage, geometryList);
+    ImageMetaData::setStereo(finalImage, false);
     return finalImage;
 }
 
@@ -219,6 +235,8 @@ static ResultVariant readImage(int fileDescriptor, const QVariantMap &metadata)
             }
         }
     }
+
+    ImageMetaData::setStereo(resultImage, metadata.value(u"stereo"_s).toBool());
 
     QDataStream stream(&file);
     stream.readRawData(reinterpret_cast<char *>(resultImage.bits()), resultImage.sizeInBytes());
@@ -414,7 +432,11 @@ ImagePlatform::ShutterModes ImagePlatformKWin::supportedShutterModes() const
     return ShutterMode::Immediate;
 }
 
-void ImagePlatformKWin::doGrab(ShutterMode, GrabMode grabMode, bool includePointer, bool includeDecorations, bool includeShadow)
+void ImagePlatformKWin::doGrab(ShutterMode,
+                               GrabMode grabMode,
+                               bool includePointer,
+                               bool includeDecorations,
+                               bool includeShadow)
 {
     ScreenShotFlags flags = ScreenShotFlag::NativeSize;
 
@@ -473,9 +495,9 @@ void ImagePlatformKWin::trackSource(ScreenShotSource2 *source)
 }
 
 template<typename OutputSignal>
-void ImagePlatformKWin::trackSource(ScreenShotSourceMeta2 *source, OutputSignal outputSignal)
+void ImagePlatformKWin::trackSource(ScreenShotSourceMeta2 *source, OutputSignal outputSignal, bool ordinaryWorkspace)
 {
-    connect(source, &ScreenShotSourceMeta2::finished, this, [this, source, outputSignal](const QList<ResultVariant> &results) {
+    connect(source, &ScreenShotSourceMeta2::finished, this, [this, source, outputSignal, ordinaryWorkspace](const QList<ResultVariant> &results) {
         source->deleteLater();
         QList<QImage> images;
         QString errorString;
@@ -489,7 +511,11 @@ void ImagePlatformKWin::trackSource(ScreenShotSourceMeta2 *source, OutputSignal 
         }
 
         if (!images.empty()) {
-            Q_EMIT (this->*outputSignal)(combinedImage(images));
+            auto image = combinedImage(images);
+            if (ordinaryWorkspace) {
+                ImageMetaData::setStereo(image, false);
+            }
+            Q_EMIT (this->*outputSignal)(image);
         }
         if (!errorString.isEmpty()) {
             Q_EMIT newScreenshotFailed(errorString);
@@ -525,7 +551,7 @@ void ImagePlatformKWin::takeScreenShotWorkspace(ScreenShotFlags flags)
     for (auto screen : screens) {
         sources.emplaceBack(new ScreenShotSourceScreen2(screen, flags));
     }
-    trackSource(new ScreenShotSourceMeta2(sources), &ImagePlatform::newScreenshotTaken);
+    trackSource(new ScreenShotSourceMeta2(sources), &ImagePlatform::newScreenshotTaken, true);
 }
 
 void ImagePlatformKWin::takeScreenShotCroppable(ScreenShotFlags flags)

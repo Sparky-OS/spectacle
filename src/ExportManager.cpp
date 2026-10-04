@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QClipboard>
+#include <QDataStream>
 #include <QDir>
 #include <QFileDialog>
 #include <QImageWriter>
@@ -140,7 +141,7 @@ QUrl ExportManager::getAutosaveFilename() const
     const QDir baseDirPath(baseDir);
     const QString filename = formattedFilename(Settings::imageFilenameTemplate(), m_timestamp, ImageMetaData::windowTitle(m_saveImage), Settings::imageSaveLocation());
     const QString fullpath = autoIncrementFilename(baseDirPath.filePath(filename),
-                                                   Settings::preferredImageFormat().toLower(),
+                                                   imageFileSuffix({}),
                                                    &ExportManager::isFileExists);
 
     const QUrl fileNameUrl = QUrl::fromUserInput(fullpath);
@@ -396,11 +397,21 @@ QString ExportManager::autoIncrementFilename(const QString &baseName, const QStr
 
 QString ExportManager::imageFileSuffix(const QUrl &url) const
 {
-    QMimeDatabase mimedb;
-    const QString type = mimedb.mimeTypeForUrl(url).preferredSuffix();
+    QString type = QFileInfo(url.path()).suffix().toLower();
+    if (type.isEmpty()) {
+        QMimeDatabase mimedb;
+        type = mimedb.mimeTypeForUrl(url).preferredSuffix();
+    }
 
     if (type.isEmpty()) {
-        return Settings::self()->preferredImageFormat().toLower();
+        type = Settings::preferredImageFormat().toLower();
+    }
+
+    if (ImageMetaData::isStereo(m_saveImage) && type != u"jps"_s && type != u"mpo"_s) {
+        if (type == u"jpg"_s || type == u"jpeg"_s || type == u"webp"_s || type == u"avif"_s) {
+            return u"jps"_s;
+        }
+        return u"mpo"_s;
     }
     return type;
 }
@@ -450,7 +461,10 @@ bool ExportManager::writeImage(QIODevice *device, const QByteArray &suffix, QByt
     // From looking at how QImageWriter handles the built-in supported formats internally,
     // "format" basically means the file extension, not the mimetype.
     QImageWriter imageWriter(device, suffix);
-    if (imageWriter.supportsOption(QImageIOHandler::Quality)) {
+    if (suffix == "mpo") {
+        // MPO stores JPEG images; use the highest quality and no chroma subsampling.
+        imageWriter.setQuality(100);
+    } else if (imageWriter.supportsOption(QImageIOHandler::Quality)) {
         imageWriter.setQuality(Settings::imageCompressionQuality());
     }
     /** Set compression 50 if the format is png. Otherwise if no compression value is specified
@@ -585,15 +599,24 @@ bool ExportManager::save(const QUrl &url, QByteArrayView encodedImage)
     }
 
     const QString suffix = imageFileSuffix(url);
+    QUrl saveUrl = url;
+    if (ImageMetaData::isStereo(m_saveImage)) {
+        QString path = saveUrl.path();
+        const qsizetype dot = path.lastIndexOf(u'.');
+        if (dot >= 0) {
+            path.truncate(dot);
+        }
+        saveUrl.setPath(path + u'.' + suffix);
+    }
     bool saveSucceded = false;
-    if (url.isLocalFile()) {
-        saveSucceded = localSave(url, suffix, encodedImage);
+    if (saveUrl.isLocalFile()) {
+        saveSucceded = localSave(saveUrl, suffix, encodedImage);
     } else {
-        saveSucceded = remoteSave(url, suffix, encodedImage);
+        saveSucceded = remoteSave(saveUrl, suffix, encodedImage);
     }
     if (saveSucceded) {
         m_imageSavedNotInTemp = true;
-        KRecentDocument::add(url, QGuiApplication::desktopFileName());
+        KRecentDocument::add(saveUrl, QGuiApplication::desktopFileName());
     }
     return saveSucceded;
 }
@@ -632,7 +655,6 @@ void ExportManager::exportImage(ExportManager::Actions actions, QUrl url)
     if (actions & SaveAs) {
         QStringList supportedFilters;
 
-        // construct the supported mimetype list
         const auto mimeTypes = QImageWriter::supportedMimeTypes();
         supportedFilters.reserve(mimeTypes.count());
         for (const auto &mimeType : mimeTypes) {
@@ -640,7 +662,7 @@ void ExportManager::exportImage(ExportManager::Actions actions, QUrl url)
         }
 
         // construct the file name
-        const QString filenameExtension = Settings::self()->preferredImageFormat().toLower();
+        const QString filenameExtension = imageFileSuffix({});
         const QString mimetype = QMimeDatabase().mimeTypeForFile(u"~/fakefile."_s + filenameExtension, QMimeDatabase::MatchExtension).name();
         auto dialog = new QFileDialog();
         dialog->setAcceptMode(QFileDialog::AcceptSave);
@@ -676,7 +698,7 @@ void ExportManager::exportImage(ExportManager::Actions actions, QUrl url)
         return;
     }
 
-    const auto preferredFormat = Settings::preferredImageFormat().toLower();
+    const auto preferredFormat = imageFileSuffix({});
     QByteArray sharedImageData;
     bool hasSharedImageData = false;
     bool saved = actions & AnySave;
@@ -720,7 +742,10 @@ void ExportManager::exportImage(ExportManager::Actions actions, QUrl url)
             QBuffer buffer(&encodedImage);
             buffer.open(QIODevice::WriteOnly);
             QImageWriter writer(&buffer, preferredFormat.toLatin1());
-            if (preferredFormat != u"png" && writer.supportsOption(QImageIOHandler::Quality)) {
+            if (preferredFormat == u"mpo") {
+                // MPO stores JPEG images; use the highest quality and no chroma subsampling.
+                writer.setQuality(100);
+            } else if (preferredFormat != u"png" && writer.supportsOption(QImageIOHandler::Quality)) {
                 writer.setQuality(Settings::imageCompressionQuality());
             }
             writer.write(image);

@@ -146,6 +146,8 @@ Q_SIGNALS:
     void qrCodeScanned(const QVariant &content);
 
 private:
+    friend class FilenameTest;
+
     static QString truncatedFilename(const QString &filename);
     using FileNameAlreadyUsedCheck = bool (ExportManager::*)(const QUrl &) const;
     QString autoIncrementFilename(const QString &baseName, const QString &extension, FileNameAlreadyUsedCheck isFileNameUsed) const;

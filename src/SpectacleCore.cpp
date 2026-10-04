@@ -119,7 +119,11 @@ SpectacleCore::SpectacleCore(QObject *parent)
         }
     };
     auto onFinished = [this]() {
-        m_imagePlatform->doGrab(ImagePlatform::ShutterMode::Immediate, m_lastGrabMode, m_lastIncludePointer, m_lastIncludeDecorations, m_lastIncludeShadow);
+        m_imagePlatform->doGrab(ImagePlatform::ShutterMode::Immediate,
+                                m_lastGrabMode,
+                                m_lastIncludePointer,
+                                m_lastIncludeDecorations,
+                                m_lastIncludeShadow);
     };
     QObject::connect(delayAnimation, &QVariantAnimation::stateChanged,
                      this, onStateChanged, Qt::QueuedConnection);
@@ -1108,7 +1112,11 @@ void SpectacleCore::activate(const QStringList &arguments, const QString &workin
         if (m_videoMode) {
             startRecording(recordingMode, includePointer);
         } else {
-            takeNewScreenshot(grabMode, delayMsec, includePointer, includeDecorations, includeShadow);
+            takeNewScreenshot(grabMode,
+                              delayMsec,
+                              includePointer,
+                              includeDecorations,
+                              includeShadow);
         }
         break;
     case StartMode::Gui:
@@ -1121,7 +1129,11 @@ void SpectacleCore::activate(const QStringList &arguments, const QString &workin
                 if (m_videoMode) {
                     startRecording(recordingMode, includePointer);
                 } else {
-                    takeNewScreenshot(grabMode, delayMsec, includePointer, includeDecorations, includeShadow);
+                    takeNewScreenshot(grabMode,
+                                      delayMsec,
+                                      includePointer,
+                                      includeDecorations,
+                                      includeShadow);
                 }
             }
         } else {
@@ -1129,7 +1141,11 @@ void SpectacleCore::activate(const QStringList &arguments, const QString &workin
             switch (Settings::printKeyRunningAction()) {
             case Actions::TakeNewScreenshot: {
                 // takeNewScreenshot switches to on click if immediate is not supported.
-                takeNewScreenshot(grabMode, 0, includePointer, includeDecorations, includeShadow);
+                takeNewScreenshot(grabMode,
+                                  0,
+                                  includePointer,
+                                  includeDecorations,
+                                  includeShadow);
                 break;
             }
             case Actions::FocusWindow: {
@@ -1165,7 +1181,11 @@ void SpectacleCore::activate(const QStringList &arguments, const QString &workin
     }
 }
 
-void SpectacleCore::takeNewScreenshot(ImagePlatform::GrabMode grabMode, int timeout, bool includePointer, bool includeDecorations, bool includeWindowShadow)
+void SpectacleCore::takeNewScreenshot(ImagePlatform::GrabMode grabMode,
+                                      int timeout,
+                                      bool includePointer,
+                                      bool includeDecorations,
+                                      bool includeWindowShadow)
 {
     if (m_cliOptions[CommandLineOptions::EditExisting]) {
         // Clear when a new screenshot is taken to avoid overwriting
@@ -1185,7 +1205,11 @@ void SpectacleCore::takeNewScreenshot(ImagePlatform::GrabMode grabMode, int time
         && m_imagePlatform->supportedShutterModes().testFlag(ImagePlatform::OnClick)
     ) {
         SpectacleWindow::setVisibilityForAll(QWindow::Hidden);
-        m_imagePlatform->doGrab(ImagePlatform::ShutterMode::OnClick, m_lastGrabMode, m_lastIncludePointer, m_lastIncludeDecorations, m_lastIncludeShadow);
+        m_imagePlatform->doGrab(ImagePlatform::ShutterMode::OnClick,
+                                m_lastGrabMode,
+                                m_lastIncludePointer,
+                                m_lastIncludeDecorations,
+                                m_lastIncludeShadow);
         return;
     }
 
@@ -1211,7 +1235,11 @@ void SpectacleCore::takeNewScreenshot(ImagePlatform::GrabMode grabMode, int time
     if (noDelay) {
         SpectacleWindow::setVisibilityForAll(QWindow::Hidden);
         QTimer::singleShot(timeout, this, [this]() {
-            m_imagePlatform->doGrab(ImagePlatform::ShutterMode::Immediate, m_lastGrabMode, m_lastIncludePointer, m_lastIncludeDecorations, m_lastIncludeShadow);
+            m_imagePlatform->doGrab(ImagePlatform::ShutterMode::Immediate,
+                                    m_lastGrabMode,
+                                    m_lastIncludePointer,
+                                    m_lastIncludeDecorations,
+                                    m_lastIncludeShadow);
         });
         return;
     }
@@ -1230,7 +1258,11 @@ void SpectacleCore::takeNewScreenshot(int captureMode, int timeout, bool include
     if (timeout < 0 && !m_imagePlatform->supportedShutterModes().testFlag(ImagePlatform::OnClick)) {
         timeout = Settings::captureDelay() * 1000;
     }
-    takeNewScreenshot(toGrabMode(CaptureMode(captureMode), Settings::transientOnly()), timeout, includePointer, includeDecorations, includeShadow);
+    takeNewScreenshot(toGrabMode(CaptureMode(captureMode), Settings::transientOnly()),
+                      timeout,
+                      includePointer,
+                      includeDecorations,
+                      includeShadow);
 }
 
 void SpectacleCore::cancelScreenshot()
@@ -1479,6 +1511,7 @@ void SpectacleCore::syncExportImage()
     auto image = m_annotationDocument->renderToImage();
     auto canvasPos = m_annotationDocument->canvasRect().topLeft();
     ImageMetaData::setLogicalXY(image, canvasPos.x(), canvasPos.y());
+    ImageMetaData::setStereo(image, ImageMetaData::isStereo(m_annotationDocument->baseImage()));
     setExportImage(image);
 }
 
@@ -1589,7 +1622,11 @@ void SpectacleCore::setVideoMode(bool videoMode)
     m_videoMode = videoMode;
     if (!videoMode && m_annotationDocument->baseImage().isNull()) {
         // Change this if there ends up being a way to toggle video mode outside of rectangle capture mode.
-        takeNewScreenshot(ImagePlatform::PerScreenImageNative, 0, Settings::includePointer(), Settings::includeDecorations(), Settings::includeShadow());
+        takeNewScreenshot(ImagePlatform::PerScreenImageNative,
+                          0,
+                          Settings::includePointer(),
+                          Settings::includeDecorations(),
+                          Settings::includeShadow());
     }
     Q_EMIT videoModeChanged(videoMode);
 }

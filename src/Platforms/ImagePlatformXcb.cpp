@@ -171,7 +171,11 @@ ImagePlatform::ShutterModes ImagePlatformXcb::supportedShutterModes() const
     return {ShutterMode::Immediate | ShutterMode::OnClick};
 }
 
-void ImagePlatformXcb::doGrab(ShutterMode shutterMode, GrabMode grabMode, bool includePointer, bool includeDecorations, bool includeShadow)
+void ImagePlatformXcb::doGrab(ShutterMode shutterMode,
+                             GrabMode grabMode,
+                             bool includePointer,
+                             bool includeDecorations,
+                             bool includeShadow)
 {
     switch (shutterMode) {
     case ShutterMode::Immediate: {
