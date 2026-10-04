@@ -21,6 +21,7 @@ static const auto screen = u"screen"_s;
 static const QString logicalX = u"logicalX"_s;
 static const QString logicalY = u"logicalY"_s;
 static const auto subGeometryList = u"subGeometryList"_s;
+static const auto stereo = u"stereo"_s;
 enum SubGeometryProperty : quint8 { X, Y, Width, Height, DevicePixelRatio };
 }
 
@@ -54,6 +55,16 @@ inline QString screen(const QImage &image)
 inline void setScreen(QImage &image, const QString &screen)
 {
     image.setText(Keys::screen, screen);
+}
+
+inline bool isStereo(const QImage &image)
+{
+    return image.text(Keys::stereo) == u"true"_s;
+}
+
+inline void setStereo(QImage &image, bool stereo)
+{
+    image.setText(Keys::stereo, stereo ? u"true"_s : u"false"_s);
 }
 
 template<typename Map>

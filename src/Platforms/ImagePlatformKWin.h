@@ -66,7 +66,11 @@ public:
 
 public Q_SLOTS:
     void
-    doGrab(ImagePlatform::ShutterMode shutterMode, ImagePlatform::GrabMode grabMode, bool includePointer, bool includeDecorations, bool includeShadow) override;
+    doGrab(ImagePlatform::ShutterMode shutterMode,
+           ImagePlatform::GrabMode grabMode,
+           bool includePointer,
+           bool includeDecorations,
+           bool includeShadow) override;
 
 private Q_SLOTS:
     void updateSupportedGrabModes();
@@ -82,7 +86,7 @@ private:
 
     void trackSource(ScreenShotSource2 *source);
     template<typename OutputSignal>
-    void trackSource(ScreenShotSourceMeta2 *source, OutputSignal outputSignal);
+    void trackSource(ScreenShotSourceMeta2 *source, OutputSignal outputSignal, bool ordinaryWorkspace = false);
 
     int m_apiVersion = 1;
     GrabModes m_grabModes;

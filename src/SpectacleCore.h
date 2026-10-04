@@ -119,6 +119,11 @@ public Q_SLOTS:
                            bool includePointer = Settings::includePointer(),
                            bool includeDecorations = Settings::includeDecorations(),
                            bool includeShadow = Settings::includeShadow());
+    void takeNewScreenshot(ImagePlatform::GrabMode grabMode,
+                           int timeout,
+                           bool includePointer,
+                           bool includeDecorations,
+                           bool includeWindowShadow);
     void cancelScreenshot();
     void showErrorMessage(const QString &message);
 
@@ -143,7 +148,6 @@ private:
         Recording,
     };
 
-    void takeNewScreenshot(ImagePlatform::GrabMode grabMode, int timeout, bool includePointer, bool includeDecorations, bool includeShadow);
     void setExportImage(const QImage &image);
     void showViewerIfGuiMode(bool minimized = false);
     void doNotify(ScreenCapture type, const ExportManager::Actions &actions, const QUrl &saveUrl);

@@ -4,11 +4,18 @@
 
 #include <QDir>
 #include <QFile>
+#include <QBuffer>
 #include <QLocale>
+#include <QImage>
+#include <QImageReader>
+#include <QImageWriter>
+#include <QMimeDatabase>
+#include <QPainter>
 #include <QTest>
 #include <QUuid>
 
 #include "ExportManager.h"
+#include "ImageMetaData.h"
 
 using namespace Qt::StringLiterals;
 
@@ -29,6 +36,11 @@ private Q_SLOTS:
     void testWindowTitle();
     void testNumbering();
     void testCombined();
+    void testStereoMimeTypes();
+    void testStereoFormatMapping();
+    void testJpsPluginWriter();
+    void testMpoPluginWriter();
+    void testFlatWriter();
 };
 
 void FilenameTest::initTestCase()
@@ -132,6 +144,114 @@ void FilenameTest::testCombined()
              u"App_Spectacle/Date_20190322_Time_08:43:25PM<notaplaceholder>"_s);
     QCOMPARE(mExportManager->formattedFilename(filenameTemplate, timestamp),
              u"App/Date_20190322_Time_08:43:25PM<notaplaceholder>"_s);
+}
+
+static void verifyEyeColor(const QImage &image, const QColor &expectedColor)
+{
+    QCOMPARE(image.width(), 4);
+    QCOMPARE(image.height(), 2);
+    const QColor color = image.pixelColor(2, 1);
+    if (expectedColor == Qt::red) {
+        QVERIFY2(color.red() > color.blue(), qPrintable(color.name()));
+    } else {
+        QVERIFY2(color.blue() > color.red(), qPrintable(color.name()));
+    }
+}
+
+void FilenameTest::testStereoMimeTypes()
+{
+    const auto mimeTypes = QImageWriter::supportedMimeTypes();
+    QVERIFY(mimeTypes.contains("image/x-jps"));
+    QVERIFY(mimeTypes.contains("image/x-mpo"));
+
+    const QMimeDatabase mimeDatabase;
+    QCOMPARE(mimeDatabase.mimeTypeForFile(u"x.jps"_s, QMimeDatabase::MatchExtension).name(), u"image/x-jps"_s);
+    QCOMPARE(mimeDatabase.mimeTypeForFile(u"x.mpo"_s, QMimeDatabase::MatchExtension).name(), u"image/x-mpo"_s);
+}
+
+static QImage stereoTestImage()
+{
+    QImage image(8, 2, QImage::Format_RGB32);
+    image.fill(Qt::red);
+    QPainter painter(&image);
+    painter.fillRect(4, 0, 4, 2, Qt::blue);
+    painter.end();
+    ImageMetaData::setStereo(image, true);
+    return image;
+}
+
+void FilenameTest::testStereoFormatMapping()
+{
+    const auto previousFormat = Settings::preferredImageFormat();
+    mExportManager->m_saveImage = stereoTestImage();
+
+    Settings::setPreferredImageFormat(u"JPG"_s);
+    QCOMPARE(mExportManager->imageFileSuffix({}), u"jps"_s);
+    Settings::setPreferredImageFormat(u"PNG"_s);
+    QCOMPARE(mExportManager->imageFileSuffix({}), u"mpo"_s);
+
+    ImageMetaData::setStereo(mExportManager->m_saveImage, false);
+    Settings::setPreferredImageFormat(u"JPG"_s);
+    QCOMPARE(mExportManager->imageFileSuffix({}), u"jpg"_s);
+    Settings::setPreferredImageFormat(previousFormat);
+}
+
+void FilenameTest::testJpsPluginWriter()
+{
+    mExportManager->m_saveImage = stereoTestImage();
+
+    QBuffer output;
+    QVERIFY(output.open(QIODevice::WriteOnly));
+    QVERIFY(mExportManager->writeImage(&output, "jps"));
+    output.close();
+
+    QByteArray data = output.buffer();
+    QBuffer input(&data);
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    QImageReader reader(&input, "jps");
+    const QImage result = reader.read();
+    QVERIFY2(!result.isNull(), qPrintable(reader.errorString()));
+    QCOMPARE(result.size(), QSize(8, 2));
+    verifyEyeColor(result.copy(0, 0, 4, 2), Qt::blue);
+    verifyEyeColor(result.copy(4, 0, 4, 2), Qt::red);
+}
+
+void FilenameTest::testMpoPluginWriter()
+{
+    mExportManager->m_saveImage = stereoTestImage();
+
+    QBuffer output;
+    QVERIFY(output.open(QIODevice::WriteOnly));
+    QVERIFY(mExportManager->writeImage(&output, "mpo"));
+    output.close();
+
+    QByteArray data = output.buffer();
+    QBuffer input(&data);
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    QImageReader reader(&input, "mpo");
+    QCOMPARE(reader.imageCount(), 2);
+    const QImage left = reader.read();
+    QVERIFY(reader.jumpToImage(1));
+    const QImage right = reader.read();
+    QVERIFY2(!left.isNull(), qPrintable(reader.errorString()));
+    QVERIFY2(!right.isNull(), qPrintable(reader.errorString()));
+    verifyEyeColor(left, Qt::red);
+    verifyEyeColor(right, Qt::blue);
+}
+
+void FilenameTest::testFlatWriter()
+{
+    QImage image(2, 2, QImage::Format_RGB32);
+    image.fill(Qt::magenta);
+    ImageMetaData::setStereo(image, false);
+    mExportManager->m_saveImage = image;
+
+    QBuffer output;
+    QVERIFY(output.open(QIODevice::WriteOnly));
+    QVERIFY(mExportManager->writeImage(&output, "png"));
+    output.close();
+
+    QCOMPARE(QImage::fromData(output.buffer(), "png"), image);
 }
 
 QTEST_GUILESS_MAIN(FilenameTest)
