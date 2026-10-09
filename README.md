@@ -1,3 +1,29 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/sparky-stereo-os/sparkyos-swirl-light-128.png">
+  <img src=".github/sparky-stereo-os/sparkyos-swirl-dark-128.png" alt="SparkyOS" width="128" height="128">
+</picture>
+
+## Sparky Stereo OS
+
+This is the stereo version of Spectacle by Sparky Stereo OS, forked from [KDE/spectacle](https://github.com/KDE/spectacle).
+It saves stereo screenshots as JPS and as MPO (CIPA DC-007 Multi-Picture Format) pictures.
+
+Where it comes from:
+
+- [Spectacle](https://invent.kde.org/plasma/spectacle) is made by the KDE community. Its authors are Boudhayan Gupta, David Redondo and Noah Davis.
+- [Debian](https://www.debian.org/) is the base of the system.
+- [SparkyLinux](https://sparkylinux.org/), by Paweł "pavroo" Pijanowski, builds on Debian.
+- [Sparky Stereo OS](https://github.com/Sparky-OS/sparky-stereo-os) is the stereo 3D edition of SparkyLinux: SparkyOS, powered by Debian.
+
+The `stereo3d` branch holds the version the distribution builds.
+KDE develops Spectacle on invent.kde.org.
+The canonical version of this work is there too, on the [`stereo3d`](https://invent.kde.org/danielcamposramos/spectacle/-/tree/stereo3d) branch.
+The licences are unchanged; see [LICENSES](LICENSES).
+
+Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo" Pijanowski).
+
+---
+
 # <img src="logo.png" width="48"/> Spectacle - The KDE Screenshot Utility
 
 Spectacle is a screenshot taking utility for the KDE desktop. Spectacle
