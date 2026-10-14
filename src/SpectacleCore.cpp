@@ -1291,6 +1291,10 @@ void SpectacleCore::showViewerIfGuiMode(bool minimized)
         ViewerWindow::instance()->showMinimized();
     } else {
         ViewerWindow::instance()->setVisible(true);
+        // The viewer is a new window after a capture. Like the capture windows when
+        // they are shown, it asks to be activated, so that it also comes in front of
+        // the windows that were on top while it was hidden.
+        ViewerWindow::instance()->requestActivate();
     }
 }
 
